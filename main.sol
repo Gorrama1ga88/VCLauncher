@@ -478,3 +478,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
         if (d.allowSelfServeWithSignature && signature.length != 0) {
             _verifyAttestation(investor, dealId, nextInvestorCommitted, aDealId, aMaxCommit, aDeadline, aNonce, aFlags, signature);
         }
+    }
+
+    function _verifyAttestation(
+        address investor,
+        uint256 dealId,
+        uint256 nextInvestorCommitted,
+        uint256 aDealId,
+        uint256 aMaxCommit,
+        uint64 aDeadline,
+        uint256 aNonce,
+        uint32 aFlags,
+        bytes memory signature
+    ) internal {
+        if (signature.length == 0) revert VCLaunch_SignatureInvalid();
+        if (aDealId != dealId) revert VCLaunch_SignatureInvalid();
+        if (block.timestamp > aDeadline) revert VCLaunch_SignatureExpired();
+        if (aNonce != attestationNonces[investor]) revert VCLaunch_NonceMismatch();
+        if (nextInvestorCommitted > aMaxCommit) revert VCLaunch_ComplianceDenied();
+
+        bytes32 structHash = keccak256(
+            abi.encode(ATTESTATION_TYPEHASH, investor, dealId, aMaxCommit, aDeadline, aFlags, aNonce)
+        );
+        bytes32 digest = _hashTypedDataV4(structHash);
+        address recovered = ECDSA.recover(digest, signature);
+        if (recovered != ADDRESS_D) revert VCLaunch_SignatureInvalid();
+
+        unchecked {
+            attestationNonces[investor] = aNonce + 1;
+        }
+
+        // Optionally persist flags (without overwriting a stricter profile).
+        ComplianceProfile storage p = _profiles[investor];
+        if ((p.flags & 0x1) == 0) {
+            p.flags |= aFlags;
+        }
+    }
+
+    // =============================================================
+    // Refunds
+    // =============================================================
