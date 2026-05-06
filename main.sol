@@ -558,3 +558,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
         if (pos.committed == 0) revert VCLaunch_ClaimUnavailable();
 
         uint256 entitlement = _entitlementFor(d, pos.committed);
+        uint256 vested = _vestedAmount(d.vesting, entitlement);
+        if (vested <= pos.claimed) revert VCLaunch_NoClaimable();
+
+        uint256 claimable = vested - pos.claimed;
+
+        uint256 remainingDeposits = d.totalPayoutDeposited - d.totalPayoutClaimed;
+        if (claimable > remainingDeposits) revert VCLaunch_DistributionInsufficient();
+
+        pos.claimed += claimable;
+        d.totalPayoutClaimed += claimable;
+
+        d.payoutAsset.safeTransfer(msg.sender, claimable);
+        emit VCLaunch_Claimed(dealId, msg.sender, claimable, pos.claimed);
+    }
+
+    function previewClaim(uint256 dealId, address investor)
+        external
+        view
+        returns (uint256 committed, uint256 entitlement, uint256 vested, uint256 claimed, uint256 claimable)
+    {
+        Deal storage d = _deals[dealId];
+        if (dealId == 0 || dealId > dealCount) revert VCLaunch_InvalidDeal();
+        InvestorPosition storage pos = _positions[dealId][investor];
+
+        committed = pos.committed;
+        entitlement = committed == 0 ? 0 : _entitlementFor(d, committed);
+        vested = entitlement == 0 ? 0 : _vestedAmount(d.vesting, entitlement);
+        claimed = pos.claimed;
+        claimable = vested > claimed ? vested - claimed : 0;
+    }
+
+    // =============================================================
+    // View helpers
+    // =============================================================
+
+    function getDeal(uint256 dealId)
+        external
+        view
+        returns (
+            DealState state,
