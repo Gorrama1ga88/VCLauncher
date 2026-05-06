@@ -118,3 +118,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
 
     event VCLaunch_Committed(uint256 indexed dealId, address indexed investor, uint256 amount, uint256 newTotal);
     event VCLaunch_Refunded(uint256 indexed dealId, address indexed investor, uint256 amount);
+
+    event VCLaunch_PayoutDeposited(uint256 indexed dealId, address indexed from, uint256 amount, uint256 totalDeposited);
+    event VCLaunch_Claimed(uint256 indexed dealId, address indexed investor, uint256 amount, uint256 cumulativeClaimed);
+
+    event VCLaunch_ComplianceProfileSet(address indexed investor, uint32 flags, uint64 validUntil, uint96 capOverride);
+    event VCLaunch_ComplianceSignerRotated(address indexed previousSigner, address indexed nextSigner);
+
+    event VCLaunch_Paused(address indexed by);
+    event VCLaunch_Unpaused(address indexed by);
+
+    // =============================================================
+    // Types
+    // =============================================================
+
+    enum DealState {
+        Draft,
+        Live,
+        Finalized,
+        Cancelled
+    }
+
+    struct VestingSchedule {
+        uint64 start;
+        uint64 cliff;
+        uint64 end;
+        bool enabled;
+    }
+
+    struct Deal {
+        DealState state;
+        IERC20 commitmentAsset;
+        IERC20 payoutAsset;
+        uint64 startTime;
+        uint64 endTime;
+        uint256 softCap;
+        uint256 hardCap;
+        uint256 minCommit;
+        uint256 maxCommitPerInvestor;
+        uint256 payoutRate; // payout tokens per commitment token, scaled by 1e18
+        uint16 feeBps;
