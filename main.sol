@@ -438,3 +438,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
 
         uint256 nextTotal = d.totalCommitted + amount;
         if (nextTotal > d.hardCap) revert VCLaunch_HardCapExceeded();
+
+        _enforceCompliance(d, dealId, investor, nextInvestorCommitted, aDealId, aMaxCommit, aDeadline, aNonce, aFlags, signature);
+
+        pos.committed = nextInvestorCommitted;
+        d.totalCommitted = nextTotal;
+
+        d.commitmentAsset.safeTransferFrom(investor, address(this), amount);
+        emit VCLaunch_Committed(dealId, investor, amount, nextTotal);
+    }
+
+    function _enforceCompliance(
+        Deal storage d,
+        uint256 dealId,
+        address investor,
+        uint256 nextInvestorCommitted,
+        uint256 aDealId,
+        uint256 aMaxCommit,
+        uint64 aDeadline,
+        uint256 aNonce,
+        uint32 aFlags,
+        bytes memory signature
+    ) internal {
+        ComplianceProfile memory profile = _profiles[investor];
+
+        bool blocked = (profile.flags & 0x1) != 0;
+        if (blocked) revert VCLaunch_ComplianceDenied();
+
+        if (d.kycRequired) {
+            bool kycOk = (profile.flags & 0x2) != 0;
+            bool timeOk = profile.validUntil == 0 || block.timestamp <= profile.validUntil;
+            if (!kycOk || !timeOk) {
+                if (!d.allowSelfServeWithSignature) revert VCLaunch_ComplianceDenied();
+                _verifyAttestation(investor, dealId, nextInvestorCommitted, aDealId, aMaxCommit, aDeadline, aNonce, aFlags, signature);
+                return;
+            }
+        }
+
+        if (d.allowSelfServeWithSignature && signature.length != 0) {
+            _verifyAttestation(investor, dealId, nextInvestorCommitted, aDealId, aMaxCommit, aDeadline, aNonce, aFlags, signature);
+        }
