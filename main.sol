@@ -78,3 +78,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
     error VCLaunch_MaxCommitExceeded();
     error VCLaunch_CommitmentAssetMismatch();
     error VCLaunch_PayoutAssetMismatch();
+    error VCLaunch_TransferProhibited();
+    error VCLaunch_RefundUnavailable();
+    error VCLaunch_ClaimUnavailable();
+    error VCLaunch_NoClaimable();
+    error VCLaunch_ComplianceDenied();
+    error VCLaunch_SignatureExpired();
+    error VCLaunch_SignatureInvalid();
+    error VCLaunch_NonceMismatch();
+    error VCLaunch_FeeTooHigh();
+    error VCLaunch_VestingInvalid();
+    error VCLaunch_DistributionInsufficient();
+    error VCLaunch_DepositNotAllowed();
+    error VCLaunch_EthNotAccepted();
+
+    // =============================================================
+    // Events
+    // =============================================================
+
+    event VCLaunch_DealCreated(
+        uint256 indexed dealId,
+        address indexed commitmentAsset,
+        address indexed payoutAsset,
+        bytes32 metadataHash,
+        uint64 startTime,
+        uint64 endTime
+    );
+
+    event VCLaunch_DealParametersUpdated(
+        uint256 indexed dealId,
+        bytes32 indexed field,
+        uint256 previousValue,
+        uint256 nextValue
+    );
+
+    event VCLaunch_DealLive(uint256 indexed dealId, uint64 startTime, uint64 endTime);
+    event VCLaunch_DealCancelled(uint256 indexed dealId, bytes32 indexed reasonTag);
+    event VCLaunch_DealFinalized(uint256 indexed dealId, bool success, uint256 totalCommitted, uint256 feePaid);
+
+    event VCLaunch_Committed(uint256 indexed dealId, address indexed investor, uint256 amount, uint256 newTotal);
+    event VCLaunch_Refunded(uint256 indexed dealId, address indexed investor, uint256 amount);
