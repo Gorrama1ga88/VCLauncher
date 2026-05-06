@@ -678,3 +678,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
     }
 
     function _validateVesting(VestingSchedule calldata v) internal pure {
+        if (!v.enabled) {
+            return;
+        }
+        if (v.start == 0 || v.end == 0) revert VCLaunch_VestingInvalid();
+        if (v.end <= v.start) revert VCLaunch_VestingInvalid();
+        if (v.cliff != 0 && (v.cliff < v.start || v.cliff > v.end)) revert VCLaunch_VestingInvalid();
+        if (uint256(v.end - v.start) > MAX_VESTING_DURATION) revert VCLaunch_VestingInvalid();
+    }
+
+    function _entitlementFor(Deal storage d, uint256 committed) internal view returns (uint256) {
+        // payout = committed * payoutRate / 1e18
+        return Math.mulDiv(committed, d.payoutRate, RATE_SCALE);
+    }
+
+    function _vestedAmount(VestingSchedule memory v, uint256 total) internal view returns (uint256) {
+        if (!v.enabled) {
+            return total;
+        }
+
+        uint256 t = block.timestamp;
+        if (t <= v.start) {
+            return 0;
+        }
+
+        if (v.cliff != 0 && t < v.cliff) {
+            return 0;
+        }
+
+        if (t >= v.end) {
+            return total;
+        }
+
+        uint256 elapsed = t - uint256(v.start);
+        uint256 duration = uint256(v.end) - uint256(v.start);
+        return Math.mulDiv(total, elapsed, duration);
+    }
+
+    // =============================================================
+    // Asset recovery (strict)
+    // =============================================================
