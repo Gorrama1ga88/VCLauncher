@@ -278,3 +278,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
         uint64 endTime;
         uint256 softCap;
         uint256 hardCap;
+        uint256 minCommit;
+        uint256 maxCommitPerInvestor;
+        uint256 payoutRate;
+        uint16 feeBps;
+        bool kycRequired;
+        bool allowSelfServeWithSignature;
+        bytes32 metadataHash;
+        VestingSchedule vesting;
+    }
+
+    function createDeal(DealParams calldata p) external onlyRole(MANAGER_ROLE) whenNotPaused returns (uint256 dealId) {
+        if (address(p.commitmentAsset) == address(0) || address(p.payoutAsset) == address(0)) {
+            revert VCLaunch_InvalidAddress();
+        }
+        if (address(p.commitmentAsset) == address(p.payoutAsset)) {
+            revert VCLaunch_PayoutAssetMismatch();
+        }
+        if (p.startTime == 0 || p.endTime == 0 || p.endTime <= p.startTime) {
+            revert VCLaunch_InvalidTime();
+        }
+        uint64 duration = p.endTime - p.startTime;
+        if (duration < MIN_DEAL_DURATION || duration > MAX_DEAL_DURATION) {
+            revert VCLaunch_InvalidTime();
+        }
+        if (p.hardCap == 0 || p.hardCap < p.softCap) revert VCLaunch_InvalidAmount();
+        if (p.minCommit == 0 || p.maxCommitPerInvestor == 0 || p.maxCommitPerInvestor < p.minCommit) {
+            revert VCLaunch_InvalidAmount();
+        }
+        if (p.payoutRate == 0) revert VCLaunch_InvalidRate();
+        if (p.feeBps > MAX_FEE_BPS) revert VCLaunch_FeeTooHigh();
+        _validateVesting(p.vesting);
+
+        dealId = ++dealCount;
+        Deal storage d = _deals[dealId];
+
+        d.state = DealState.Draft;
+        d.commitmentAsset = p.commitmentAsset;
+        d.payoutAsset = p.payoutAsset;
+        d.startTime = p.startTime;
+        d.endTime = p.endTime;
