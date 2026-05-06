@@ -158,3 +158,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
         uint256 maxCommitPerInvestor;
         uint256 payoutRate; // payout tokens per commitment token, scaled by 1e18
         uint16 feeBps;
+        bool kycRequired;
+        bool allowSelfServeWithSignature;
+        bytes32 metadataHash;
+        bytes32 cancelTag;
+        VestingSchedule vesting;
+        uint256 totalCommitted;
+        uint256 totalRefunded;
+        uint256 totalPayoutDeposited;
+        uint256 totalPayoutClaimed;
+    }
+
+    struct InvestorPosition {
+        uint256 committed;
+        uint256 refunded;
+        uint256 claimed;
+    }
+
+    struct ComplianceProfile {
+        // flags: bitfield determined by compliance ops
+        // 0x1 => blocked, 0x2 => kyc_ok, 0x4 => accredited, 0x8 => institution
+        uint32 flags;
+        uint64 validUntil;
+        uint96 capOverride;
+    }
+
+    struct InvestorAttestation {
+        address investor;
+        uint256 dealId;
+        uint256 maxCommit;
+        uint64 deadline;
+        uint32 flags;
+        uint256 nonce;
+    }
+
+    // =============================================================
+    // Storage
+    // =============================================================
+
+    uint256 public dealCount;
+    mapping(uint256 => Deal) private _deals;
