@@ -598,3 +598,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
         view
         returns (
             DealState state,
+            address commitmentAsset,
+            address payoutAsset,
+            uint64 startTime,
+            uint64 endTime,
+            uint256 softCap,
+            uint256 hardCap,
+            uint256 minCommit,
+            uint256 maxCommitPerInvestor,
+            uint256 payoutRate,
+            uint16 feeBps,
+            bool kycRequired,
+            bool allowSelfServeWithSignature,
+            bytes32 metadataHash,
+            bytes32 cancelTag,
+            VestingSchedule memory vesting,
+            uint256 totalCommitted,
+            uint256 totalRefunded,
+            uint256 totalPayoutDeposited,
+            uint256 totalPayoutClaimed
+        )
+    {
+        Deal storage d = _deals[dealId];
+        if (dealId == 0 || dealId > dealCount) revert VCLaunch_InvalidDeal();
+
+        state = d.state;
+        commitmentAsset = address(d.commitmentAsset);
+        payoutAsset = address(d.payoutAsset);
+        startTime = d.startTime;
+        endTime = d.endTime;
+        softCap = d.softCap;
+        hardCap = d.hardCap;
+        minCommit = d.minCommit;
+        maxCommitPerInvestor = d.maxCommitPerInvestor;
+        payoutRate = d.payoutRate;
+        feeBps = d.feeBps;
+        kycRequired = d.kycRequired;
+        allowSelfServeWithSignature = d.allowSelfServeWithSignature;
+        metadataHash = d.metadataHash;
+        cancelTag = d.cancelTag;
+        vesting = d.vesting;
