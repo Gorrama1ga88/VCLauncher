@@ -518,3 +518,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
     // =============================================================
     // Refunds
     // =============================================================
+
+    function refund(uint256 dealId) external whenNotPaused nonReentrant {
+        Deal storage d = _getDeal(dealId);
+        if (d.state != DealState.Cancelled) revert VCLaunch_DealNotCancelled();
+
+        InvestorPosition storage pos = _positions[dealId][msg.sender];
+        uint256 committed = pos.committed;
+        if (committed == 0) revert VCLaunch_RefundUnavailable();
+        uint256 refundable = committed - pos.refunded;
+        if (refundable == 0) revert VCLaunch_RefundUnavailable();
+
+        pos.refunded += refundable;
+        d.totalRefunded += refundable;
+
+        d.commitmentAsset.safeTransfer(msg.sender, refundable);
+        emit VCLaunch_Refunded(dealId, msg.sender, refundable);
+    }
+
+    // =============================================================
+    // Payout deposits & claims
+    // =============================================================
+
+    function depositPayout(uint256 dealId, uint256 amount) external whenNotPaused nonReentrant {
+        Deal storage d = _getDeal(dealId);
+        if (d.state != DealState.Finalized) revert VCLaunch_NotFinalized();
+        if (amount == 0) revert VCLaunch_InvalidAmount();
+
+        d.totalPayoutDeposited += amount;
+        d.payoutAsset.safeTransferFrom(msg.sender, address(this), amount);
+        emit VCLaunch_PayoutDeposited(dealId, msg.sender, amount, d.totalPayoutDeposited);
+    }
+
+    function claim(uint256 dealId) external whenNotPaused nonReentrant {
+        Deal storage d = _getDeal(dealId);
+        if (d.state != DealState.Finalized) revert VCLaunch_NotFinalized();
+
+        InvestorPosition storage pos = _positions[dealId][msg.sender];
+        if (pos.committed == 0) revert VCLaunch_ClaimUnavailable();
+
+        uint256 entitlement = _entitlementFor(d, pos.committed);
