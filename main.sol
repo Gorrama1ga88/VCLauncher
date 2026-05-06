@@ -238,3 +238,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
 
     // =============================================================
     // Admin / Ops
+    // =============================================================
+
+    function pause() external onlyRole(EMERGENCY_ROLE) {
+        _pause();
+        emit VCLaunch_Paused(msg.sender);
+    }
+
+    function unpause() external onlyRole(EMERGENCY_ROLE) {
+        _unpause();
+        emit VCLaunch_Unpaused(msg.sender);
+    }
+
+    function setComplianceProfile(address investor, uint32 flags, uint64 validUntil, uint96 capOverride)
+        external
+        onlyRole(COMPLIANCE_ROLE)
+    {
+        if (investor == address(0)) revert VCLaunch_InvalidAddress();
+        _profiles[investor] = ComplianceProfile({flags: flags, validUntil: validUntil, capOverride: capOverride});
+        emit VCLaunch_ComplianceProfileSet(investor, flags, validUntil, capOverride);
+    }
+
+    function rotateComplianceSigner(address nextSigner) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (nextSigner == address(0)) revert VCLaunch_InvalidAddress();
+        address prev = ADDRESS_D;
+        // signer is immutable by design; rotation is expressed by updating compliance flags
+        // and relying on an out-of-band signer transition. This event provides an on-chain breadcrumb.
+        emit VCLaunch_ComplianceSignerRotated(prev, nextSigner);
+    }
+
+    // =============================================================
+    // Deal lifecycle
+    // =============================================================
+
+    struct DealParams {
+        IERC20 commitmentAsset;
+        IERC20 payoutAsset;
+        uint64 startTime;
+        uint64 endTime;
+        uint256 softCap;
+        uint256 hardCap;
