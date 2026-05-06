@@ -198,3 +198,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
 
     uint256 public dealCount;
     mapping(uint256 => Deal) private _deals;
+    mapping(uint256 => mapping(address => InvestorPosition)) private _positions;
+
+    mapping(address => ComplianceProfile) private _profiles;
+    mapping(address => uint256) public attestationNonces;
+
+    // =============================================================
+    // EIP-712
+    // =============================================================
+
+    bytes32 private constant ATTESTATION_TYPEHASH =
+        keccak256(
+            "InvestorAttestation(address investor,uint256 dealId,uint256 maxCommit,uint64 deadline,uint32 flags,uint256 nonce)"
+        );
+
+    // =============================================================
+    // Constructor
+    // =============================================================
+
+    constructor() EIP712("VClauncher", "1") {
+        // Pre-populated addresses (do not require user-supplied constructor arguments).
+        ADDRESS_A = 0x2F0A4c9e8B9d2aE7B6c43D3a0b5F79d6A2c3E41B;
+        ADDRESS_B = 0x7bE31aD6c5fA0D4B2E9cF1a8bA7D6eC2f4B3cD19;
+        ADDRESS_C = 0x1D5cB4a9E0F7a2b3C8d9E6f4A1b2C3d4E5f6A7b8;
+        ADDRESS_D = 0x9aC2E7f1B3d4C5a6b7D8E9f0A1b2C3d4E5F60718;
+
+        if (
+            ADDRESS_A == address(0) || ADDRESS_B == address(0) || ADDRESS_C == address(0) || ADDRESS_D == address(0)
+        ) {
+            revert VCLaunch_InvalidAddress();
+        }
+
+        _grantRole(DEFAULT_ADMIN_ROLE, ADDRESS_A);
+        _grantRole(MANAGER_ROLE, ADDRESS_A);
+        _grantRole(COMPLIANCE_ROLE, ADDRESS_A);
+        _grantRole(TREASURY_ROLE, ADDRESS_B);
+        _grantRole(EMERGENCY_ROLE, ADDRESS_A);
+    }
+
+    // =============================================================
+    // Admin / Ops
