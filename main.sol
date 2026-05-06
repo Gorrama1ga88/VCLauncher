@@ -318,3 +318,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
         d.payoutAsset = p.payoutAsset;
         d.startTime = p.startTime;
         d.endTime = p.endTime;
+        d.softCap = p.softCap;
+        d.hardCap = p.hardCap;
+        d.minCommit = p.minCommit;
+        d.maxCommitPerInvestor = p.maxCommitPerInvestor;
+        d.payoutRate = p.payoutRate;
+        d.feeBps = p.feeBps;
+        d.kycRequired = p.kycRequired;
+        d.allowSelfServeWithSignature = p.allowSelfServeWithSignature;
+        d.metadataHash = p.metadataHash;
+        d.vesting = p.vesting;
+
+        emit VCLaunch_DealCreated(
+            dealId,
+            address(p.commitmentAsset),
+            address(p.payoutAsset),
+            p.metadataHash,
+            p.startTime,
+            p.endTime
+        );
+    }
+
+    function setDealLive(uint256 dealId) external onlyRole(MANAGER_ROLE) whenNotPaused {
+        Deal storage d = _getDeal(dealId);
+        if (d.state != DealState.Draft) revert VCLaunch_InvalidDeal();
+        if (block.timestamp >= d.endTime) revert VCLaunch_InvalidTime();
+        d.state = DealState.Live;
+        emit VCLaunch_DealLive(dealId, d.startTime, d.endTime);
+    }
+
+    function cancelDeal(uint256 dealId, bytes32 reasonTag) external onlyRole(MANAGER_ROLE) whenNotPaused {
+        Deal storage d = _getDeal(dealId);
+        if (d.state == DealState.Finalized) revert VCLaunch_AlreadyFinalized();
+        if (d.state == DealState.Cancelled) revert VCLaunch_DealCancelled();
+        d.state = DealState.Cancelled;
+        d.cancelTag = reasonTag;
+        emit VCLaunch_DealCancelled(dealId, reasonTag);
+    }
+
+    function finalizeDeal(uint256 dealId) external onlyRole(TREASURY_ROLE) whenNotPaused nonReentrant {
+        Deal storage d = _getDeal(dealId);
