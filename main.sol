@@ -718,3 +718,33 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
     // =============================================================
     // Asset recovery (strict)
     // =============================================================
+
+    function recoverToken(address token, address to, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
+        if (to == address(0)) revert VCLaunch_InvalidAddress();
+        if (amount == 0) revert VCLaunch_InvalidAmount();
+
+        // Prevent sweeping live commitment assets for any non-terminal deal; payout assets are also protected.
+        for (uint256 i = 1; i <= dealCount; ++i) {
+            Deal storage d = _deals[i];
+            if (d.state == DealState.Live || d.state == DealState.Draft) {
+                if (token == address(d.commitmentAsset) || token == address(d.payoutAsset)) {
+                    revert VCLaunch_TransferProhibited();
+                }
+            }
+        }
+
+        IERC20(token).safeTransfer(to, amount);
+    }
+
+    // =============================================================
+    // Eth handling
+    // =============================================================
+
+    receive() external payable {
+        revert VCLaunch_EthNotAccepted();
+    }
+
+    fallback() external payable {
+        revert VCLaunch_EthNotAccepted();
+    }
+}
