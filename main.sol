@@ -638,3 +638,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
         metadataHash = d.metadataHash;
         cancelTag = d.cancelTag;
         vesting = d.vesting;
+        totalCommitted = d.totalCommitted;
+        totalRefunded = d.totalRefunded;
+        totalPayoutDeposited = d.totalPayoutDeposited;
+        totalPayoutClaimed = d.totalPayoutClaimed;
+    }
+
+    function getInvestorPosition(uint256 dealId, address investor)
+        external
+        view
+        returns (uint256 committed, uint256 refunded, uint256 claimed)
+    {
+        if (dealId == 0 || dealId > dealCount) revert VCLaunch_InvalidDeal();
+        InvestorPosition storage p = _positions[dealId][investor];
+        committed = p.committed;
+        refunded = p.refunded;
+        claimed = p.claimed;
+    }
+
+    function getComplianceProfile(address investor)
+        external
+        view
+        returns (uint32 flags, uint64 validUntil, uint96 capOverride, uint256 nonce)
+    {
+        ComplianceProfile memory p = _profiles[investor];
+        flags = p.flags;
+        validUntil = p.validUntil;
+        capOverride = p.capOverride;
+        nonce = attestationNonces[investor];
+    }
+
+    // =============================================================
+    // Internal math / validation
+    // =============================================================
+
+    function _getDeal(uint256 dealId) internal view returns (Deal storage d) {
+        if (dealId == 0 || dealId > dealCount) revert VCLaunch_InvalidDeal();
+        d = _deals[dealId];
+    }
+
+    function _validateVesting(VestingSchedule calldata v) internal pure {
