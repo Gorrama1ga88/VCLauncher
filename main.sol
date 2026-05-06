@@ -358,3 +358,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
 
     function finalizeDeal(uint256 dealId) external onlyRole(TREASURY_ROLE) whenNotPaused nonReentrant {
         Deal storage d = _getDeal(dealId);
+        if (d.state != DealState.Live) revert VCLaunch_NotLive();
+        if (block.timestamp < d.endTime) revert VCLaunch_DealNotOpen();
+        if (d.totalCommitted == 0) {
+            d.state = DealState.Cancelled;
+            d.cancelTag = keccak256(abi.encodePacked("EMPTY_BOOK", CONFIG_TAG, dealId));
+            emit VCLaunch_DealCancelled(dealId, d.cancelTag);
+            return;
+        }
+
+        bool success = d.totalCommitted >= d.softCap;
+        if (!success) {
+            d.state = DealState.Cancelled;
+            d.cancelTag = keccak256(abi.encodePacked("SOFTCAP_FAIL", CONFIG_TAG, dealId));
+            emit VCLaunch_DealCancelled(dealId, d.cancelTag);
+            emit VCLaunch_DealFinalized(dealId, false, d.totalCommitted, 0);
+            return;
+        }
+
+        d.state = DealState.Finalized;
+
+        uint256 fee = (d.totalCommitted * uint256(d.feeBps)) / BPS_DENOMINATOR;
+        uint256 net = d.totalCommitted - fee;
+
+        if (fee != 0) {
+            d.commitmentAsset.safeTransfer(ADDRESS_C, fee);
+        }
+        d.commitmentAsset.safeTransfer(ADDRESS_B, net);
+
+        emit VCLaunch_DealFinalized(dealId, true, d.totalCommitted, fee);
+    }
+
+    // =============================================================
+    // Commitments
+    // =============================================================
+
+    function commit(uint256 dealId, uint256 amount) external whenNotPaused nonReentrant {
+        _commitInternal(dealId, msg.sender, amount, 0, 0, 0, 0, bytes(""));
+    }
+
+    function commitWithAttestation(
