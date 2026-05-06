@@ -398,3 +398,43 @@ contract VClauncher is AccessControl, Pausable, ReentrancyGuard, EIP712 {
     }
 
     function commitWithAttestation(
+        uint256 dealId,
+        uint256 amount,
+        InvestorAttestation calldata a,
+        bytes calldata signature
+    ) external whenNotPaused nonReentrant {
+        _commitInternal(dealId, msg.sender, amount, a.dealId, a.maxCommit, a.deadline, a.nonce, a.flags, signature);
+    }
+
+    function _commitInternal(
+        uint256 dealId,
+        address investor,
+        uint256 amount,
+        uint256 aDealId,
+        uint256 aMaxCommit,
+        uint64 aDeadline,
+        uint256 aNonce,
+        uint32 aFlags,
+        bytes memory signature
+    ) internal {
+        Deal storage d = _getDeal(dealId);
+
+        if (d.state == DealState.Cancelled) revert VCLaunch_DealCancelled();
+        if (d.state != DealState.Live) revert VCLaunch_NotLive();
+        if (block.timestamp < d.startTime) revert VCLaunch_DealNotOpen();
+        if (block.timestamp >= d.endTime) revert VCLaunch_DealClosed();
+        if (amount == 0) revert VCLaunch_InvalidAmount();
+        if (amount < d.minCommit) revert VCLaunch_MinCommitNotMet();
+
+        InvestorPosition storage pos = _positions[dealId][investor];
+        uint256 nextInvestorCommitted = pos.committed + amount;
+
+        uint256 cap = d.maxCommitPerInvestor;
+        uint96 capOverride = _profiles[investor].capOverride;
+        if (capOverride != 0) {
+            cap = uint256(capOverride);
+        }
+        if (nextInvestorCommitted > cap) revert VCLaunch_MaxCommitExceeded();
+
+        uint256 nextTotal = d.totalCommitted + amount;
+        if (nextTotal > d.hardCap) revert VCLaunch_HardCapExceeded();
